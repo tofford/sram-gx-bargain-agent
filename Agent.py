@@ -1,256 +1,237 @@
+import csv
 import json
+import os
 import re
 import smtplib
-import sqlite3
+import sys
 from datetime import datetime, timezone
 from email.message import EmailMessage
+from pathlib import Path
 
 import requests
 from bs4 import BeautifulSoup
 
-with open("config.json", "r") as f:
-    config = json.load(f)
+CONFIG_FILE = Path("config.json")
+HISTORY_FILE = Path("price_history.csv")
+STATE_FILE = Path("alert_state.json")
 
-DB = "prices.db"
+USER_AGENT = (
+    "Mozilla/5.0 (compatible; SRAM-XG1275-Bargain-Watcher/1.0; "
+    "+https://github.com/)"
+)
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0 (compatible; BargainWatcher/1.0)"
-}
-
-
-def setup_database():
-    db = sqlite3.connect(DB)
-
-    db.execute("""
-        CREATE TABLE IF NOT EXISTS prices (
-            id INTEGER PRIMARY KEY,
-            name TEXT,
-            price REAL,
-            url TEXT,
-            checked_at TEXT
-        )
-    """)
-
-    db.commit()
-    return db
+EXCLUDED_TERMS = ("t-type", "t type", "transmission")
+REQUIRED_TERMS = ("xg-1275", "10-52")
 
 
-def get_price(text):
-    prices = re.findall(r'\$\s*(\d+(?:\.\d{1,2})?)', text)
+def load_json(path, default):
+    if not path.exists():
+        return default
+    with path.open("r", encoding="utf-8") as file:
+        return json.load(file)
 
-    if not prices:
+
+def save_json(path, data):
+    with path.open("w", encoding="utf-8") as file:
+        json.dump(data, file, indent=2)
+
+
+def clean_price(value):
+    if value is None:
         return None
-
-    prices = [float(p) for p in prices]
-
-    # Ignore obviously unrelated numbers
-    prices = [p for p in prices if 20 <= p <= 2000]
-
-    return min(prices) if prices else None
+    match = re.search(r"(\d[\d,]*(?:\.\d{1,2})?)", str(value))
+    return float(match.group(1).replace(",", "")) if match else None
 
 
-def search_page(url):
+def page_matches_product(soup):
+    text = soup.get_text(" ", strip=True).lower()
+
+    if any(term in text for term in EXCLUDED_TERMS):
+        return False, "Excluded: page mentions T-Type/Transmission"
+
+    if not all(term in text for term in REQUIRED_TERMS):
+        return False, "Product match not confirmed (needs XG-1275 and 10-52)"
+
+    return True, None
+
+
+def extract_price(soup, selector=None):
+    # A custom selector in config takes priority.
+    if selector:
+        element = soup.select_one(selector)
+        if element:
+            price = clean_price(element.get_text(" ", strip=True))
+            if price is not None:
+                return price
+
+    # Common structured price fields used by stores.
+    candidates = [
+        ('meta[property="product:price:amount"]', "content"),
+        ('meta[itemprop="price"]', "content"),
+        ('meta[name="twitter:data1"]', "content"),
+        ('[itemprop="price"]', "content"),
+    ]
+
+    for css_selector, attribute in candidates:
+        element = soup.select_one(css_selector)
+        if element:
+            raw = element.get(attribute) or element.get_text(" ", strip=True)
+            price = clean_price(raw)
+            if price is not None:
+                return price
+
+    # JSON-LD product data, commonly the most reliable source.
+    for script in soup.select('script[type="application/ld+json"]'):
+        try:
+            data = json.loads(script.string or script.get_text())
+        except json.JSONDecodeError:
+            continue
+
+        items = data if isinstance(data, list) else [data]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            offers = item.get("offers", [])
+            if isinstance(offers, dict):
+                offers = [offers]
+
+            for offer in offers:
+                if isinstance(offer, dict):
+                    price = clean_price(offer.get("price") or offer.get("lowPrice"))
+                    if price is not None:
+                        return price
+
+    return None
+
+
+def check_source(source):
+    name = source["name"]
+    url = source["url"]
+
     try:
         response = requests.get(
             url,
-            headers=HEADERS,
-            timeout=20
+            headers={"User-Agent": USER_AGENT},
+            timeout=30,
         )
-
         response.raise_for_status()
+    except requests.RequestException as error:
+        return {"name": name, "url": url, "price": None, "status": f"Request failed: {error}"}
 
-        soup = BeautifulSoup(
-            response.text,
-            "html.parser"
-        )
+    soup = BeautifulSoup(response.text, "html.parser")
+    matches, reason = page_matches_product(soup)
+    if not matches:
+        return {"name": name, "url": url, "price": None, "status": reason}
 
-        results = []
+    price = extract_price(soup, source.get("price_selector"))
+    if price is None:
+        return {"name": name, "url": url, "price": None, "status": "No price found"}
 
-        for item in soup.find_all(
-            ["h1", "h2", "h3", "h4", "a"]
-        ):
-
-            name = item.get_text(
-                " ",
-                strip=True
-            )
-
-            if not name:
-                continue
-
-            surrounding_text = item.parent.get_text(
-                " ",
-                strip=True
-            )
-
-            price = get_price(
-                surrounding_text
-            )
-
-            if price:
-                results.append({
-                    "name": name,
-                    "price": price,
-                    "url": url
-                })
-
-        return results
-
-    except Exception as e:
-        print(
-            f"Could not check {url}: {e}"
-        )
-
-        return []
+    return {"name": name, "url": url, "price": price, "status": "OK"}
 
 
-def is_target_product(name):
-
-    name = name.lower()
-
-    required = config[
-        "target_product"
-    ]["required_terms"]
-
-    excluded = config[
-        "target_product"
-    ]["excluded_terms"]
-
-    for term in required:
-        if term not in name:
-            return False
-
-    for term in excluded:
-        if term in name:
-            return False
-
-    return True
+def append_history(timestamp, result, currency):
+    new_file = not HISTORY_FILE.exists()
+    with HISTORY_FILE.open("a", newline="", encoding="utf-8") as file:
+        writer = csv.writer(file)
+        if new_file:
+            writer.writerow(["checked_at_utc", "store", "price", "currency", "status", "url"])
+        writer.writerow([
+            timestamp,
+            result["name"],
+            result["price"] if result["price"] is not None else "",
+            currency,
+            result["status"],
+            result["url"],
+        ])
 
 
-def send_email(subject, message):
+def send_alert(currency, threshold, bargains):
+    gmail_address = os.getenv("GMAIL_ADDRESS")
+    gmail_password = os.getenv("GMAIL_APP_PASSWORD")
+    alert_to = os.getenv("ALERT_TO")
 
-    smtp_server = "smtp.gmail.com"
-    smtp_port = 587
+    missing = [
+        name for name, value in {
+            "GMAIL_ADDRESS": gmail_address,
+            "GMAIL_APP_PASSWORD": gmail_password,
+            "ALERT_TO": alert_to,
+        }.items() if not value
+    ]
+    if missing:
+        raise RuntimeError(f"Missing GitHub Actions secret(s): {', '.join(missing)}")
 
-    sender = "YOUR_EMAIL"
-    password = "YOUR_APP_PASSWORD"
-    recipient = "YOUR_EMAIL"
+    lines = [
+        f"{item['name']}: {currency}{item['price']:.2f}",
+        item["url"],
+        "",
+    ] for item in bargains
 
-    email = EmailMessage()
+    body = (
+        "A SRAM GX Eagle XG-1275 10-52T listing reached your alert price.\n\n"
+        + "\n".join(line for group in lines for line in group)
+        + f"\nAlert threshold: {currency}{threshold:.2f}\n"
+        + "\nPlease confirm stock, currency, shipping, and final checkout price before buying."
+    )
 
-    email["Subject"] = subject
-    email["From"] = sender
-    email["To"] = recipient
+    message = EmailMessage()
+    message["Subject"] = f"SRAM XG-1275 bargain: {currency}{threshold:.0f} alert"
+    message["From"] = gmail_address
+    message["To"] = alert_to
+    message.set_content(body)
 
-    email.set_content(message)
-
-    with smtplib.SMTP(
-        smtp_server,
-        smtp_port
-    ) as server:
-
-        server.starttls()
-
-        server.login(
-            sender,
-            password
-        )
-
-        server.send_message(
-            email
-        )
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as smtp:
+        smtp.login(gmail_address, gmail_password)
+        smtp.send_message(message)
 
 
 def main():
+    config = load_json(CONFIG_FILE, {})
+    sources = config.get("sources", [])
+    thresholds = sorted(config.get("alert_thresholds", [300, 275]), reverse=True)
+    currency = config.get("currency_symbol", "$")
 
-    db = setup_database()
+    if not sources:
+        raise RuntimeError("No sources found in config.json")
 
-    # Initial NZ cycling retailers.
-    sites = [
-        "https://www.giantwellington.co.nz/",
-        "https://www.bikeaholic.co.nz/",
-        "https://www.pushbikes.co.nz/"
-    ]
+    state = load_json(STATE_FILE, {"sent_alerts": {}})
+    timestamp = datetime.now(timezone.utc).isoformat()
 
-    target = config[
-        "target_product"
-    ]
+    results = [check_source(source) for source in sources]
 
-    target_price = target[
-        "target_price"
-    ]
+    for result in results:
+        append_history(timestamp, result, currency)
+        print(f"{result['name']}: {result['price'] or '—'} ({result['status']})")
 
-    strong_price = target[
-        "strong_price"
-    ]
+    for threshold in thresholds:
+        bargains = [
+            result for result in results
+            if result["price"] is not None and result["price"] <= threshold
+        ]
 
-    for site in sites:
+        active_keys = {f"{result['url']}|{threshold}" for result in bargains}
 
-        results = search_page(site)
+        # Allow a fresh alert if a product later rises above the threshold, then drops again.
+        for key in list(state["sent_alerts"]):
+            if key.endswith(f"|{threshold}") and key not in active_keys:
+                del state["sent_alerts"][key]
 
-        for result in results:
+        new_bargains = [
+            result for result in bargains
+            if f"{result['url']}|{threshold}" not in state["sent_alerts"]
+        ]
 
-            if not is_target_product(
-                result["name"]
-            ):
-                continue
+        if new_bargains:
+            send_alert(currency, threshold, new_bargains)
+            for result in new_bargains:
+                state["sent_alerts"][f"{result['url']}|{threshold}"] = timestamp
 
-            price = result["price"]
-
-            db.execute(
-                """
-                INSERT INTO prices
-                (name, price, url, checked_at)
-                VALUES (?, ?, ?, ?)
-                """,
-                (
-                    result["name"],
-                    price,
-                    result["url"],
-                    datetime.now(
-                        timezone.utc
-                    ).isoformat()
-                )
-            )
-
-            db.commit()
-
-            if price <= strong_price:
-
-                send_email(
-                    "🚨 SRAM GX Eagle bargain",
-                    f"""
-SRAM GX Eagle XG-1275 10-52T
-
-PRICE: ${price:.2f}
-
-This is below your strong-buy
-threshold of ${strong_price}.
-
-Link:
-{result["url"]}
-"""
-                )
-
-            elif price <= target_price:
-
-                send_email(
-                    "SRAM GX Eagle good deal",
-                    f"""
-SRAM GX Eagle XG-1275 10-52T
-
-PRICE: ${price:.2f}
-
-This is below your target price
-of ${target_price}.
-
-Link:
-{result["url"]}
-"""
-                )
-
-    db.close()
+    save_json(STATE_FILE, state)
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except Exception as error:
+        print(f"Agent failed: {error}", file=sys.stderr)
+        raise
