@@ -161,15 +161,17 @@ def send_alert(currency, threshold, bargains):
     if missing:
         raise RuntimeError(f"Missing GitHub Actions secret(s): {', '.join(missing)}")
 
-    lines = [
-        f"{item['name']}: {currency}{item['price']:.2f}",
-        item["url"],
-        "",
-    ] for item in bargains
+    bargain_lines = []
+    for item in bargains:
+        bargain_lines.extend([
+            f"{item['name']}: {currency}{item['price']:.2f}",
+            item["url"],
+            "",
+        ])
 
     body = (
         "A SRAM GX Eagle XG-1275 10-52T listing reached your alert price.\n\n"
-        + "\n".join(line for group in lines for line in group)
+        + "\n".join(bargain_lines)
         + f"\nAlert threshold: {currency}{threshold:.2f}\n"
         + "\nPlease confirm stock, currency, shipping, and final checkout price before buying."
     )
