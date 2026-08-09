@@ -1,18 +1,11 @@
 {
-  "currency": "NZD",
-  "target_product": {
-    "name": "SRAM GX Eagle XG-1275 12-speed 10-52T",
-    "target_price": 300,
-    "strong_price": 275,
-    "required_terms": [
-      "xg-1275",
-      "10-52"
-    ],
-    "excluded_terms": [
-      "xs-1275",
-      "t-type",
-      "transmission",
-      "10-50"
-    ]
-  }
+  "currency_symbol": "$",
+  "alert_thresholds": [300, 275],
+  "sources": [
+    {
+      "name": "Example Bike Store",
+      "url": "https://example.com/sram-gx-eagle-xg-1275-10-52t",
+      "price_selector": ".price"
+    }
+  ]
 }
