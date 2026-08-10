@@ -3,8 +3,8 @@
   "alert_thresholds": [300, 275],
   "sources": [
     {
-      "name": "Example Bike Store",
-      "url": "https://example.com/sram-gx-eagle-xg-1275-10-52t",
+      "name": "Evo Cycles",
+      "url": "https://www.evocycles.co.nz/Product/356975/sram-xg-1275-gx-eagle-12-speed-10-52t-cassette-black",
       "price_selector": ".price"
     }
   ]
