@@ -45,15 +45,12 @@ def clean_price(value):
 
 def page_matches_product(soup):
     """
-    Confirm that the page is actually the SRAM XG-1275
-    10-52T cassette.
-
-    We do NOT reject a page simply because another product
-    on the retailer's website mentions T-Type or Transmission.
+    Confirm that the page is the SRAM GX Eagle XG-1275
+    10-52T cassette without rejecting the page merely
+    because the retailer mentions other SRAM products.
     """
 
     title = ""
-
     if soup.title:
         title = soup.title.get_text(" ", strip=True)
 
@@ -63,20 +60,26 @@ def page_matches_product(soup):
 
     title = title.lower()
 
-    # The actual product title must identify the cassette.
-    if "xg-1275" not in title:
-        return False, "Product title does not contain XG-1275"
+    # XG-1275 must appear somewhere in the page.
+    page_text = soup.get_text(" ", strip=True).lower()
 
-    if "10-52" not in title and "10–52" not in title:
-        return False, "Product title does not contain 10-52"
+    if "xg-1275" not in page_text:
+        return False, "XG-1275 not found"
 
-    # Only reject T-Type if the PRODUCT TITLE itself identifies it.
+    # 10-52 can appear anywhere on the product page.
+    if (
+        "10-52" not in page_text
+        and "10–52" not in page_text
+        and "10 / 52" not in page_text
+    ):
+        return False, "10-52 not found"
+
+    # Only exclude T-Type if the actual title identifies it.
     if any(term in title for term in EXCLUDED_TERMS):
         return False, "Product title indicates T-Type/Transmission"
 
     return True, None
-
-
+    
 def extract_price(soup, selector=None):
     # A custom selector in config takes priority.
     if selector:
