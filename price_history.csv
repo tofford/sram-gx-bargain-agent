@@ -1,0 +1,4 @@
+checked_at_utc,store,price,currency,status,url
+2026-08-14T04:04:07.238267+00:00,Giant Wellington,,$,Request failed: 404 Client Error: Not Found for url: https://www.giantwellington.co.nz/collections/sram-bicycle-components/products/ram-xg-1275-gx-eagle-12spd-10-52t-cassette-black,https://www.giantwellington.co.nz/collections/sram-bicycle-components/products/ram-xg-1275-gx-eagle-12spd-10-52t-cassette-black
+2026-08-14T04:04:07.238267+00:00,Pushbikes,,$,Excluded: page mentions T-Type/Transmission,https://pushbikes.co.nz/
+2026-08-14T04:04:07.238267+00:00,Bikeaholic,,$,Product match not confirmed (needs XG-1275 and 10-52),https://www.bikeaholic.co.nz/
