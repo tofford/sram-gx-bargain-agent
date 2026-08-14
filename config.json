@@ -1,21 +1,30 @@
 {
   "sources": [
     {
-      "name": "Giant Wellington",
-      "url": "https://www.giantwellington.co.nz/collections/sram-bicycle-components/products/ram-xg-1275-gx-eagle-12spd-10-52t-cassette-black"
-    },
-    {
       "name": "Pushbikes",
-      "url": "https://pushbikes.co.nz/"
+      "url": "https://www.pushbikes.co.nz/products/sram-xg-1275-12-speed-cassette"
     },
     {
-      "name": "Bikeaholic",
-      "url": "https://www.bikeaholic.co.nz/"
+      "name": "Evo Cycles",
+      "url": "https://www.evocycles.co.nz/Product/356975/sram-xg-1275-gx-eagle-12-speed-10-52t-cassette-black"
+    },
+    {
+      "name": "Day Zero",
+      "url": "https://dayzero.co.nz/sram-gx-eagle-xg-1275-10-52t-12sp-cassette-lunar-black/"
+    },
+    {
+      "name": "Giant Wellington",
+      "url": "https://www.giantwellington.co.nz/products/ram-xg-1275-gx-eagle-12spd-10-52t-cassette-black"
+    },
+    {
+      "name": "Cycleworx",
+      "url": "https://cycleworx.co.nz/products/sram-xg-1275-gx-eagle-12-speed-10-52-cassette"
+    },
+    {
+      "name": "99 Bikes",
+      "url": "https://www.99bikes.co.nz/products/sram-am-cs-xg-1275-eagle-10-52t-blk"
     }
   ],
-  "alert_thresholds": [
-    300,
-    275
-  ],
+  "alert_thresholds": [300, 275],
   "currency_symbol": "$"
 }
