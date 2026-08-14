@@ -188,10 +188,21 @@ def send_alert(currency, threshold, bargains):
 
 
 def main():
-    config = load_json(CONFIG_FILE, {})
-    sources = config.get("sources", [])
-    thresholds = sorted(config.get("alert_thresholds", [300, 275]), reverse=True)
-    currency = config.get("currency_symbol", "$")
+config = load_json(CONFIG_FILE, {})
+
+print("========== CONFIG DEBUG ==========")
+print("Config file:", CONFIG_FILE.resolve())
+print("Config exists:", CONFIG_FILE.exists())
+print("Config contents:")
+print(json.dumps(config, indent=2))
+print("==================================")
+
+sources = config.get("sources", [])
+thresholds = sorted(
+    config.get("alert_thresholds", [300, 275]),
+    reverse=True
+)
+currency = config.get("currency_symbol", "$")
 
     if not sources:
         raise RuntimeError("No sources found in config.json")
