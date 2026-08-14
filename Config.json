@@ -1,11 +1,35 @@
 {
-  "currency_symbol": "$",
-  "alert_thresholds": [300, 275],
-  "sources": [
+  "currency": "NZD",
+  "default_shipping_nzd": 10,
+  "products": [
     {
-      "name": "Evo Cycles",
-      "url": "https://www.evocycles.co.nz/Product/356975/sram-xg-1275-gx-eagle-12-speed-10-52t-cassette-black",
-      "price_selector": ".price"
+      "name": "SRAM GX Eagle XG-1275 12-speed 10-52T",
+      "target_price_nzd": 300,
+      "strong_price_nzd": 275,
+      "required_terms": [
+        "xg-1275",
+        "10-52"
+      ],
+      "excluded_terms": [
+        "xs-1275",
+        "t-type",
+        "transmission",
+        "10-50"
+      ],
+      "sources": [
+        {
+          "name": "Giant Wellington",
+          "url": "https://www.giantwellington.co.nz/collections/sram-bicycle-components/products/ram-xg-1275-gx-eagle-12spd-10-52t-cassette-black"
+        },
+        {
+          "name": "Pushbikes",
+          "url": "https://pushbikes.co.nz/"
+        },
+        {
+          "name": "Bikeaholic",
+          "url": "https://www.bikeaholic.co.nz/"
+        }
+      ]
     }
   ]
 }
