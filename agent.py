@@ -81,54 +81,125 @@ def page_matches_product(soup):
     return True, None
     
 def extract_price(soup, selector=None):
-    # A custom selector in config takes priority.
+    """Extract a product price from common ecommerce page formats."""
+
+    # 1. Custom selector from config
     if selector:
         element = soup.select_one(selector)
         if element:
-            price = clean_price(element.get_text(" ", strip=True))
+            price = clean_price(
+                element.get("content")
+                or element.get_text(" ", strip=True)
+            )
             if price is not None:
                 return price
 
-    # Common structured price fields used by stores.
+    # 2. Common meta / HTML price fields
     candidates = [
         ('meta[property="product:price:amount"]', "content"),
+        ('meta[property="og:price:amount"]', "content"),
         ('meta[itemprop="price"]', "content"),
         ('meta[name="twitter:data1"]', "content"),
         ('[itemprop="price"]', "content"),
+        ('.price', None),
+        ('.product-price', None),
+        ('.price-item', None),
+        ('.money', None),
     ]
 
     for css_selector, attribute in candidates:
-        element = soup.select_one(css_selector)
-        if element:
-            raw = element.get(attribute) or element.get_text(" ", strip=True)
+        for element in soup.select(css_selector):
+            raw = (
+                element.get(attribute)
+                if attribute
+                else element.get_text(" ", strip=True)
+            )
+
             price = clean_price(raw)
-            if price is not None:
+
+            # Ignore obviously bogus prices.
+            if price is not None and 1 <= price <= 10000:
                 return price
 
-    # JSON-LD product data, commonly the most reliable source.
+    # 3. JSON-LD structured product data
     for script in soup.select('script[type="application/ld+json"]'):
         try:
-            data = json.loads(script.string or script.get_text())
-        except json.JSONDecodeError:
+            raw_json = script.string or script.get_text()
+            data = json.loads(raw_json)
+        except (json.JSONDecodeError, TypeError):
             continue
 
-        items = data if isinstance(data, list) else [data]
-        for item in items:
+        def inspect_item(item):
             if not isinstance(item, dict):
-                continue
+                return None
+
+            # Direct price
+            for key in ("price", "lowPrice"):
+                price = clean_price(item.get(key))
+                if price is not None and 1 <= price <= 10000:
+                    return price
+
+            # Offers
             offers = item.get("offers", [])
+
             if isinstance(offers, dict):
                 offers = [offers]
 
-            for offer in offers:
-                if isinstance(offer, dict):
-                    price = clean_price(offer.get("price") or offer.get("lowPrice"))
+            if isinstance(offers, list):
+                for offer in offers:
+                    if isinstance(offer, dict):
+                        for key in ("price", "lowPrice"):
+                            price = clean_price(offer.get(key))
+                            if price is not None and 1 <= price <= 10000:
+                                return price
+
+            # Nested graph
+            graph = item.get("@graph")
+            if isinstance(graph, list):
+                for graph_item in graph:
+                    price = inspect_item(graph_item)
                     if price is not None:
                         return price
 
+            return None
+
+        items = data if isinstance(data, list) else [data]
+
+        for item in items:
+            price = inspect_item(item)
+            if price is not None:
+                return price
+
+    # 4. Shopify product JSON embedded in the page
+    for script in soup.select("script"):
+        text = script.string or script.get_text()
+
+        if not text:
+            continue
+
+        if "product" not in text.lower() or "price" not in text.lower():
+            continue
+
+        # Look for common Shopify price representations.
+        patterns = [
+            r'"price"\s*:\s*"(\d+(?:\.\d+)?)"',
+            r'"price"\s*:\s*(\d+(?:\.\d+)?)',
+            r'"price"\s*:\s*"?(\d{3,6})"?',
+        ]
+
+        for pattern in patterns:
+            for match in re.finditer(pattern, text, re.IGNORECASE):
+                price = clean_price(match.group(1))
+
+                if price is not None:
+                    # Shopify sometimes stores prices in cents.
+                    if price > 10000:
+                        price /= 100.0
+
+                    if 1 <= price <= 10000:
+                        return price
+
     return None
-
-
 def check_source(source):
     name = source["name"]
     url = source["url"]
