@@ -26,6 +26,15 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Check repository files
+        run: |
+          echo "Current directory:"
+          pwd
+          echo "Files:"
+          ls -la
+          echo "Git tracked files:"
+          git ls-files
+          
       - name: Check prices and send alerts
         env:
           GMAIL_ADDRESS: ${{ secrets.GMAIL_ADDRESS }}
