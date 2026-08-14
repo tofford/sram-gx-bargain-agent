@@ -25,6 +25,6 @@
       "url": "https://www.99bikes.co.nz/products/sram-am-cs-xg-1275-eagle-10-52t-blk"
     }
   ],
-  "alert_thresholds": [300, 275],
+  "alert_thresholds": [400, 275],
   "currency_symbol": "$"
 }
