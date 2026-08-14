@@ -8,3 +8,9 @@ checked_at_utc,store,price,currency,status,url
 2026-08-14T04:08:43.037334+00:00,Giant Wellington,,$,Request failed: 404 Client Error: Not Found for url: https://www.giantwellington.co.nz/products/ram-xg-1275-gx-eagle-12spd-10-52t-cassette-black,https://www.giantwellington.co.nz/products/ram-xg-1275-gx-eagle-12spd-10-52t-cassette-black
 2026-08-14T04:08:43.037334+00:00,Cycleworx,,$,No price found,https://cycleworx.co.nz/products/sram-xg-1275-gx-eagle-12-speed-10-52-cassette
 2026-08-14T04:08:43.037334+00:00,99 Bikes,489.0,$,OK,https://www.99bikes.co.nz/products/sram-am-cs-xg-1275-eagle-10-52t-blk
+2026-08-14T04:14:21.458576+00:00,Pushbikes,,$,Product title does not contain 10-52,https://www.pushbikes.co.nz/products/sram-xg-1275-12-speed-cassette
+2026-08-14T04:14:21.458576+00:00,Evo Cycles,,$,No price found,https://www.evocycles.co.nz/Product/356975/sram-xg-1275-gx-eagle-12-speed-10-52t-cassette-black
+2026-08-14T04:14:21.458576+00:00,Day Zero,385.75,$,OK,https://dayzero.co.nz/sram-gx-eagle-xg-1275-10-52t-12sp-cassette-lunar-black/
+2026-08-14T04:14:21.458576+00:00,Giant Wellington,,$,Request failed: 404 Client Error: Not Found for url: https://www.giantwellington.co.nz/products/sram-xg-1275-gx-eagle-12spd-10-52t-cassette-black,https://www.giantwellington.co.nz/products/sram-xg-1275-gx-eagle-12spd-10-52t-cassette-black
+2026-08-14T04:14:21.458576+00:00,Cycleworx,,$,Product title does not contain 10-52,https://cycleworx.co.nz/products/sram-xg-1275-gx-eagle-12-speed-10-52-cassette
+2026-08-14T04:14:21.458576+00:00,99 Bikes,489.0,$,OK,https://www.99bikes.co.nz/products/sram-am-cs-xg-1275-eagle-10-52t-blk
